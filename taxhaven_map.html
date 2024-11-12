@@ -10,6 +10,7 @@
     body { margin: 0; padding: 0; }
     #map { position: absolute; top: 0; bottom: 0; width: 100%; }
 
+    /* Base styling for the pop-up container */
     .mapboxgl-popup {
         max-width: none !important;
         background-color: transparent !important;
@@ -17,12 +18,12 @@
         box-shadow: none !important;
     }
 
-    /* Base styling for the pop-up content */
+    /* Styling for the pop-up content */
     .mapboxgl-popup-content {
-        width: 90vw; /* Use viewport width to allow dynamic sizing */
-        max-width: 400px; /* Set a maximum width for larger screens */
-        max-height: 80vh; /* Limit height based on viewport height */
-        overflow-y: auto;
+        width: 90vw;
+        max-width: 400px; /* Maximum width to prevent excessive width */
+        max-height: 500px;
+        overflow-y: auto; /* Enable scrolling for overflow content */
         background-color: #333 !important;
         color: #fff !important;
         border-radius: 8px !important;
@@ -32,11 +33,17 @@
         box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5) !important;
     }
 
+    /* Hiding the pop-up tip/arrow */
+    .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+    .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+        display: none !important;
+    }
+
     /* Image styling for larger screens */
     .popup-image {
         width: 100%;
         height: auto;
-        border-radius: 4px;
+        border-radius: 4px;            
         margin-bottom: 8px;
     }
 
@@ -58,21 +65,6 @@
             transform: translate(-50%, -50%) !important; /* Center alignment */
             position: fixed !important;
         }
-    }
-
-    /* Additional adjustments for very small screens */
-    @media (max-width: 480px) {
-        .mapboxgl-popup-content {
-            width: 95vw;
-            max-width: 250px;
-            max-height: 60vh;
-            padding: 6px;
-        }
-    }
-
-    .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
-    .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
-        display: none !important;
     }
 
     /* Legend styling */
@@ -192,26 +184,27 @@
             const imageUrl = e.features[0].properties["Image"];
             const countryName = e.features[0].properties["Country"];
 
-            let popupContent = `<div class="popup-content">`;
+            // Create the HTML content for the pop-up with an inner scrollable wrapper
+            let popupContent = `<div class="popup-content"><div class="popup-scroll-content">`;
             if (imageUrl) {
                 popupContent += `<img src="${imageUrl}" class="popup-image" alt="Image">`;
             }
-            popupContent += `<h4>${countryName}</h4><p>${description}</p></div>`;
+            popupContent += `<h4>${countryName}</h4><p>${description}</p></div></div>`;
 
-            // Check if the screen width is below 768px (mobile)
+            // Remove any existing pop-ups
+            document.querySelectorAll('.mapboxgl-popup').forEach(popup => popup.remove());
+
+            // Check if the screen width is below 768px (small screens)
             if (window.innerWidth <= 768) {
-                // Remove any existing pop-ups
-                document.querySelectorAll('.mapboxgl-popup').forEach(popup => popup.remove());
-
-                // Create a centered pop-up on mobile
-                const mobilePopup = new mapboxgl.Popup({ closeOnClick: true, closeButton: true })
-                    .setLngLat(map.getCenter()) // Set it to the map center
+                // Create a centered pop-up on small screens
+                new mapboxgl.Popup({ closeOnClick: true, closeButton: true })
+                    .setLngLat(map.getCenter()) // Center on small screens
                     .setHTML(popupContent)
                     .addTo(map);
             } else {
-                // Default pop-up behavior for desktop
-                new mapboxgl.Popup()
-                    .setLngLat(coordinates)
+                // Default behavior for larger screens, showing pop-up at the click location
+                new mapboxgl.Popup({ closeOnClick: true, closeButton: true, anchor: "center" })
+                    .setLngLat(coordinates) // Show where clicked
                     .setHTML(popupContent)
                     .addTo(map);
             }
