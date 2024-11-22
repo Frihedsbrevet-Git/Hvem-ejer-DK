@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>De største ejere i hver kommune</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<style>
+body { margin: 0; padding: 0; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+</style>
+</head>
+<body>
+
+
+
+<div id="map"></div>
+
+<script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZnJpa2pzYSIsImEiOiJjbTNwcGU2emwwZjl3Mm1zZHZjYnRsN3Y3In0.HWQjC-IJ6kcNRnEVtFeuNw';
+
+    let map; // Declare map variable globally
+    let allData; // Variable to store the full dataset
+
+    // Step 1: Load GeoJSON data before initializing the map
+    console.log('Fetching data...');
+    fetch('https://raw.githubusercontent.com/Frihedsbrevet-Git/Hvem-ejer-DK/refs/heads/main/Top_3_ejendomsejere_i_5_st-rste_kommuner_i_Danmark-2.geojson')
+        .then(response => {
+            console.log('Data fetched');
+            return response.json();
+        })
+        .then(data => {
+            allData = data; // Store full dataset
+            console.log('Data loaded:', allData);
+            initializeMap(); // Initialize the map after data is loaded
+        })
+        .catch(error => console.error('Error loading GeoJSON:', error));
+
+    // Step 2: Initialize map and add full dataset as source
+    function initializeMap() {
+        console.log('Initializing map...');
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: [10.0, 56.0],
+            zoom: 6
+        });
+
+        map.on('load', () => {
+            console.log('Map loaded');
+            addDataSourceAndLayers(allData); // Add layers once map is loaded
+        });
+    }
+
+    // Step 3: Add data source and layers for clustering
+    function addDataSourceAndLayers(data) {
+        console.log('Adding data source and layers...');
+        map.addSource('custom-data', {
+            type: 'geojson',
+            data: data,
+            cluster: true,
+            clusterMaxZoom: 14,
+            clusterRadius: 50
+        });
+
+        map.addLayer({
+            id: 'clusters',
+            type: 'circle',
+            source: 'custom-data',
+            filter: ['has', 'point_count'],
+            paint: {
+                'circle-color': [
+                    'step',
+                    ['get', 'point_count'],
+                    '#ffffb2',  // Light yellow for small clusters
+                    5, '#fed976', // Soft yellow-orange
+                    10, '#feb24c', // Bright orange
+                    15, '#fd8d3c', // Deeper orange
+                    20, '#f03b20', // Vivid red-orange
+                    25, '#bd0026' // Deep red for large clusters
+                ],
+                'circle-radius': [
+                    'step',
+                    ['get', 'point_count'],
+                    10, 10, 15, 20, 20
+                ],
+                "circle-opacity": 0.8
+            }
+        });
+
+        map.addLayer({
+            id: 'cluster-count',
+            type: 'symbol',
+            source: 'custom-data',
+            filter: ['has', 'point_count'],
+            layout: {
+                'text-field': ['get', 'point_count_abbreviated'],
+                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                'text-size': 12
+            }
+        });
+
+        map.addLayer({
+            id: 'unclustered-point',
+            type: 'circle',
+            source: 'custom-data',
+            filter: ['!', ['has', 'point_count']],
+            paint: {
+                'circle-color': '#FFFFFF',
+                'circle-radius': 4,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#fff'
+            }
+        });
+
+        // Popup for unclustered points
+        map.on('click', 'unclustered-point', (e) => {
+            const coordinates = e.features[0].geometry.coordinates.slice();
+            const name = e.features[0].properties["Name"]; // Get the "Name" property
+
+            // Simplified popup content
+            const popupContent = `<div>Ejendom: ${name}</div>`;
+
+            new mapboxgl.Popup()
+                .setLngLat(coordinates)
+                .setHTML(popupContent)
+                .addTo(map);
+        });
+
+        map.on('click', 'clusters', (e) => {
+            const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+            const clusterId = features[0].properties.cluster_id;
+            map.getSource('custom-data').getClusterExpansionZoom(clusterId, (err, zoom) => {
+                if (err) return;
+                map.easeTo({
+                    center: features[0].geometry.coordinates,
+                    zoom: zoom
+                });
+            });
+        });
+        console.log('Layers added');
+    }
+</script>
+
+
+</body>
+</html>
